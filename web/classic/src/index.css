@@ -758,29 +758,29 @@ html.dark .sbg-variant-green {
 }
 
 .blur-ball-indigo {
-  background: #6366f1;
-  /* indigo-500 */
+  background: #C2410C;
+  /* HKF amber-deep (was indigo-500) */
   top: 40px;
   left: 50%;
   transform: translateX(-50%);
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
 .blur-ball-teal {
-  background: #14b8a6;
-  /* teal-400 */
+  background: #F59E0B;
+  /* HKF amber-bright (was teal-400) */
   top: 200px;
   left: 30%;
-  opacity: 0.4;
+  opacity: 0.35;
 }
 
 /* 浅色主题下让模糊球更柔和 */
 html:not(.dark) .blur-ball-indigo {
-  opacity: 0.25;
+  opacity: 0.22;
 }
 
 html:not(.dark) .blur-ball-teal {
-  opacity: 0.2;
+  opacity: 0.18;
 }
 
 /* ==================== 卡片马卡龙模糊球（类封装） ==================== */
