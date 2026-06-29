@@ -151,6 +151,11 @@ func Redeem(key string, userId int) (quota int, err error) {
 		common.SysError("redemption failed: " + err.Error())
 		return 0, ErrRedeemFailed
 	}
+	// HKF-fix(2026-06-29): 兑换在事务里直接 Update(quota) 未清缓存,relay 的 GetUserQuota 读 Redis 旧值(0)→
+	// 客户兑换后报"$0余额不足"至 60s TTL。事务成功后清用户缓存,下次读从 DB 重载新额度,即时生效。
+	if e := invalidateUserCache(userId); e != nil {
+		common.SysLog("failed to invalidate user cache after redemption: " + e.Error())
+	}
 	RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(redemption.Quota), redemption.Id))
 	return redemption.Quota, nil
 }

@@ -35,6 +35,14 @@ func PreConsumeQuota(c *gin.Context, preConsumedQuota int, relayInfo *relaycommo
 	if err != nil {
 		return types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
 	}
+	// HKF-fix(2026-06-29): 额度缓存可能落后于刚充值/兑换的 DB(60s TTL staleness)。判定额度不足前,
+	// 先从 DB 复核一次,避免误拒刚充值的客户。一处覆盖 redeem/topup/admin 等所有加额度路径,且只在
+	// "看似不足"时才多读一次 DB(额度充足的常态走快路,无额外开销)。GetUserQuota(true) 顺带刷新缓存。
+	if userQuota <= 0 || userQuota < preConsumedQuota {
+		if dbQuota, dbErr := model.GetUserQuota(relayInfo.UserId, true); dbErr == nil {
+			userQuota = dbQuota
+		}
+	}
 	if userQuota <= 0 {
 		return types.NewErrorWithStatusCode(fmt.Errorf("用户额度不足, 剩余额度: %s", logger.FormatQuota(userQuota)), types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 	}

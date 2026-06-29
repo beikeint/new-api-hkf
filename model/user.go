@@ -886,17 +886,26 @@ func IncreaseUserQuota(id int, quota int, db bool) (err error) {
 	if quota < 0 {
 		return errors.New("quota 不能为负数！")
 	}
-	gopool.Go(func() {
-		err := cacheIncrUserQuota(id, int64(quota))
-		if err != nil {
-			common.SysLog("failed to increase user quota: " + err.Error())
-		}
-	})
 	if !db && common.BatchUpdateEnabled {
+		// 批量模式:DB 写延后,先更新缓存增量
+		gopool.Go(func() {
+			if e := cacheIncrUserQuota(id, int64(quota)); e != nil {
+				common.SysLog("failed to increase user quota cache: " + e.Error())
+			}
+		})
 		addNewRecord(BatchUpdateTypeUserQuota, id, quota)
 		return nil
 	}
-	return increaseUserQuota(id, quota)
+	// 直写模式:先写 DB,再清用户缓存,使下次 GetUserCache 从 DB 重载新额度。
+	// HKF-fix(2026-06-29): 原异步 cacheIncrUserQuota(HINCRBY) 会被 GetUserCache 的异步整体写(充值前旧额度)
+	// 覆盖→额度缓存卡旧值至 60s TTL,客户充值/兑换后调用报"$0余额不足"。改为 DB 写成功后清缓存,消除该窗口。
+	if err = increaseUserQuota(id, quota); err != nil {
+		return err
+	}
+	if e := invalidateUserCache(id); e != nil {
+		common.SysLog("failed to invalidate user cache after quota increase: " + e.Error())
+	}
+	return nil
 }
 
 func increaseUserQuota(id int, quota int) (err error) {
